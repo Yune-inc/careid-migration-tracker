@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>D-8 스키마 마이그레이션 트래커 · CARE ID</title>
+<style>
+  :root{
+    --navy:#1B2A4A; --navy-2:#2B406A;
+    --blue:#2E7CF6; --blue-mid:#599BFF; --blue-soft:#EAF2FF; --blue-line:#CFE0FF;
+    --ink:#16202E; --sub:#5B6472; --mute:#8A94A6;
+    --bg:#EEF1F6; --card:#FFFFFF; --line:#E5E9F0; --line-2:#EDF0F5;
+    --red:#E0474D; --red-soft:#FDECED; --red-line:#F6C3C6;
+    --orange:#E5790B; --orange-soft:#FFF3E4; --orange-line:#F8D2A6;
+    --amber:#C99A00; --amber-soft:#FBF3D6; --amber-line:#EAD98A;
+    --green:#1B9E4B; --green-soft:#E7F6EE; --green-line:#AEE0C2;
+    --slate:#7A8597; --slate-soft:#EEF1F5; --slate-line:#D2D8E0;
+    --shadow-sm:0 1px 2px rgba(16,32,46,.05), 0 4px 14px rgba(16,32,46,.05);
+    --shadow:0 1px 2px rgba(16,32,46,.05), 0 10px 30px rgba(16,32,46,.08);
+    --r-lg:20px; --r:15px; --r-sm:10px;
+    --mono:'SF Mono','JetBrains Mono','D2Coding',Consolas,'Courier New',monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Pretendard','Malgun Gothic','Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0; font-family:var(--sans); color:var(--ink); background:var(--bg);
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    line-height:1.6; letter-spacing:-0.01em;
+  }
+  a{color:var(--blue); text-decoration:none;}
+
+  /* phase accent helpers */
+  .acc-p1{--acc:var(--blue);  --acc-soft:var(--blue-soft);  --acc-line:var(--blue-line);}
+  .acc-p2{--acc:var(--navy);  --acc-soft:#E7EAF1;            --acc-line:#C9D0DE;}
+  .acc-p3{--acc:var(--green); --acc-soft:var(--green-soft); --acc-line:var(--green-line);}
+  .acc-p4{--acc:var(--orange);--acc-soft:var(--orange-soft);--acc-line:var(--orange-line);}
+  .acc-p5{--acc:var(--slate); --acc-soft:var(--slate-soft); --acc-line:var(--slate-line);}
+
+  /* ============ sticky bar ============ */
+  .topbar{
+    position:sticky; top:0; z-index:50; background:rgba(255,255,255,.82);
+    backdrop-filter:saturate(180%) blur(18px); -webkit-backdrop-filter:saturate(180%) blur(18px);
+    border-bottom:1px solid var(--line);
+  }
+  .topbar-in{max-width:1080px; margin:0 auto; padding:10px 24px; display:flex; align-items:center; gap:18px;}
+  .brand{display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:.04em; color:var(--navy); white-space:nowrap;}
+  .brand .dot{width:9px; height:9px; border-radius:3px; background:var(--blue-mid); box-shadow:0 0 0 4px var(--blue-soft);}
+  .brand .d8{color:var(--blue); font-weight:800;}
+  .topbar-prog{flex:1; display:flex; align-items:center; gap:12px; min-width:0;}
+  .mini-track{flex:1; height:8px; border-radius:99px; background:#E3E8F0; overflow:hidden; min-width:60px;}
+  .mini-fill{height:100%; width:0%; border-radius:99px; background:linear-gradient(90deg,var(--blue),var(--blue-mid)); transition:width .5s cubic-bezier(.4,0,.2,1);}
+  .mini-pct{font-variant-numeric:tabular-nums; font-weight:800; color:var(--navy); font-size:14px; white-space:nowrap;}
+  .btn-reset{border:1px solid var(--line); background:#fff; color:var(--sub); font:inherit; font-size:13px; font-weight:600;
+    padding:7px 13px; border-radius:99px; cursor:pointer; white-space:nowrap; transition:.15s;}
+  .btn-reset:hover{border-color:var(--red-line); color:var(--red); background:var(--red-soft);}
+
+  .wrap{max-width:1080px; margin:0 auto; padding:0 24px 90px;}
+
+  /* ============ hero ============ */
+  .hero{padding:46px 0 26px;}
+  .eyebrow{font-size:13px; font-weight:700; letter-spacing:.05em; color:var(--blue); text-transform:uppercase; margin-bottom:14px;}
+  .hero h1{margin:0; font-size:clamp(30px,5vw,46px); line-height:1.12; letter-spacing:-0.03em; font-weight:850; color:var(--navy);}
+  .hero h1 .v{color:var(--blue-mid);}
+  .hero .lede{margin:14px 0 0; font-size:clamp(15px,2.4vw,18px); color:var(--sub); max-width:62ch;}
+  .meta-chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:22px;}
+  .mchip{display:inline-flex; align-items:center; gap:7px; background:#fff; border:1px solid var(--line); border-radius:99px;
+    padding:7px 14px; font-size:13px; color:var(--sub); box-shadow:var(--shadow-sm);}
+  .mchip b{color:var(--navy); font-weight:700;}
+  .mchip .k{color:var(--mute); font-size:12px;}
+
+  /* overall progress panel */
+  .opanel{margin-top:30px; background:linear-gradient(135deg,var(--navy),#22335a); border-radius:var(--r-lg); padding:26px 28px; color:#fff;
+    box-shadow:var(--shadow); position:relative; overflow:hidden;}
+  .opanel::after{content:""; position:absolute; right:-60px; top:-60px; width:240px; height:240px; border-radius:50%;
+    background:radial-gradient(circle,rgba(89,155,255,.30),transparent 70%);}
+  .opanel-top{display:flex; align-items:baseline; justify-content:space-between; gap:16px; position:relative;}
+  .opanel-top .lab{font-size:14px; color:#AEBDD8; font-weight:600; letter-spacing:.02em; white-space:nowrap;}
+  .opanel-num{font-size:46px; font-weight:850; line-height:1; letter-spacing:-0.02em; font-variant-numeric:tabular-nums;}
+  .opanel-num small{font-size:20px; font-weight:700; color:#9FB1CE; margin-left:3px;}
+  .opanel-sub{font-size:13px; color:#9FB1CE; margin-top:4px; position:relative;}
+  .big-track{margin-top:18px; height:12px; border-radius:99px; background:rgba(255,255,255,.14); overflow:hidden; position:relative;}
+  .big-fill{height:100%; width:0%; border-radius:99px; background:linear-gradient(90deg,var(--blue-mid),#8FC0FF); transition:width .6s cubic-bezier(.4,0,.2,1);}
+  .phase-mini{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:22px; position:relative;}
+  .pm{background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.10); border-radius:12px; padding:12px 12px 13px; cursor:pointer; transition:.18s; text-align:left;}
+  .pm:hover{background:rgba(255,255,255,.12); transform:translateY(-2px);}
+  .pm .pm-h{display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:700; color:#D6E0F0;}
+  .pm .pm-dot{width:9px; height:9px; border-radius:3px; flex:none;}
+  .pm .pm-pct{font-size:20px; font-weight:800; margin-top:7px; font-variant-numeric:tabular-nums;}
+  .pm .pm-track{height:5px; border-radius:99px; background:rgba(255,255,255,.16); margin-top:8px; overflow:hidden;}
+  .pm .pm-fill{height:100%; width:0%; border-radius:99px; transition:width .5s ease;}
+  .pm .pm-cnt{font-size:11px; color:#9FB1CE; margin-top:7px;}
+
+  /* ============ sections ============ */
+  section{margin-top:46px;}
+  .sec-head{display:flex; align-items:center; gap:14px; margin-bottom:18px;}
+  .sec-num{font-size:13px; font-weight:800; color:#fff; background:var(--blue); width:30px; height:30px; border-radius:9px;
+    display:grid; place-items:center; flex:none; letter-spacing:.02em;}
+  .sec-head h2{margin:0; font-size:23px; font-weight:800; letter-spacing:-0.02em; color:var(--navy);}
+  .sec-head .sub{color:var(--mute); font-size:14px; margin-left:auto; font-weight:500;}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow-sm);}
+  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  @media(max-width:720px){ .grid-2{grid-template-columns:1fr;} }
+
+  .scope{padding:20px 22px; border-left:4px solid var(--acc); border-radius:var(--r);}
+  .scope h3{margin:0 0 12px; font-size:16px; font-weight:750; color:var(--acc); display:flex; align-items:center; gap:8px;}
+  .scope ul{margin:0; padding-left:2px; list-style:none;}
+  .scope li{position:relative; padding:5px 0 5px 20px; font-size:14.5px; color:var(--ink);}
+  .scope li::before{content:""; position:absolute; left:2px; top:13px; width:6px; height:6px; border-radius:2px; background:var(--acc);}
+  .scope li code{font-family:var(--mono); font-size:12.5px; background:var(--acc-soft); color:var(--navy); padding:1px 6px; border-radius:5px;}
+  .scope li .muted{color:var(--mute);}
+
+  /* severity reference cards */
+  .bc-group{display:flex; align-items:flex-start; gap:12px; margin:8px 0 14px;}
+  .bc-group.mt{margin-top:32px;}
+  .bcg-dot{width:13px; height:13px; border-radius:4px; margin-top:8px; flex:none;}
+  .bcg-title{font-size:20px; font-weight:800; color:var(--ink); letter-spacing:-0.015em; display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .bcg-cnt{font-size:12.5px; font-weight:800; padding:2px 10px; border-radius:99px;}
+  .bcg-desc{font-size:13.5px; color:var(--sub); margin-top:5px; line-height:1.55;}
+  .bcg-ref{color:var(--mute); font-size:12px; margin-left:4px;}
+  .bc-grid{display:grid; gap:11px;}
+  .bc-row{display:flex; gap:14px; align-items:flex-start; padding:15px 18px; border-radius:var(--r); border:1px solid var(--line); background:#fff; box-shadow:var(--shadow-sm); position:relative; overflow:hidden;}
+  .bc-row::before{content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--acc);}
+  .bc-row.sev-bc{--acc:var(--red);}
+  .bc-row.sev-nbc{--acc:var(--green);}
+  .bc-tag{font-weight:800; font-size:15px; color:var(--acc); background:var(--acc-soft); border-radius:9px; flex:none; width:32px; height:32px; display:grid; place-items:center; line-height:1;}
+  .bc-row.sev-bc .bc-tag{--acc-soft:var(--red-soft);}
+  .bc-row.sev-nbc .bc-tag{--acc-soft:var(--green-soft);}
+  .bc-main{flex:1; min-width:0;}
+  .bc-change{font-size:14.5px; color:var(--ink); line-height:1.5;}
+  .bc-change code{font-family:var(--mono); font-size:12.5px; background:#F1F4F9; color:var(--navy); padding:1px 6px; border-radius:5px; white-space:nowrap;}
+  .bc-foot{display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:8px; font-size:12.5px; color:var(--sub);}
+  .bc-foot .pill{background:#F1F4F9; border-radius:99px; padding:2px 10px; color:var(--sub);}
+  .bc-foot .iss{color:var(--blue); font-weight:700;}
+  .subhead{font-size:14px; font-weight:750; color:var(--ink); margin:22px 0 12px; display:flex; align-items:center; gap:9px;}
+  .subhead .dotsev{width:9px;height:9px;border-radius:3px;}
+  .subhead .sh-text b{font-weight:800;}
+  .subhead .sh-desc{font-weight:500; color:var(--mute); font-size:13px;}
+
+  /* ============ dependency graph ============ */
+  .depwrap{padding:8px; border-radius:var(--r); background:#fff; border:1px solid var(--line); box-shadow:var(--shadow-sm); overflow-x:auto;}
+  .dep-svg{width:100%; min-width:640px; height:auto; display:block;}
+  .dep-node{cursor:default; transition:opacity .18s;}
+  .dep-node rect{transition:filter .18s;}
+  .dep-edge{transition:opacity .18s, stroke-width .18s;}
+  .dep-svg.dim .dep-node:not(.hl){opacity:.28;}
+  .dep-svg.dim .dep-edge:not(.hl){opacity:.12;}
+  .dep-edge.hl{stroke-width:3.4;}
+  .dep-legend{display:flex; flex-wrap:wrap; gap:14px; padding:10px 14px 4px;}
+  .dep-legend span{display:inline-flex; align-items:center; gap:7px; font-size:12.5px; color:var(--sub);}
+  .dep-legend i{width:13px; height:13px; border-radius:4px; display:inline-block;}
+
+  /* phase flow ribbon */
+  /* phase flow ribbon */
+  .flow-head{margin:30px 0 6px;}
+  .flow-h-title{font-size:18px; font-weight:800; color:var(--navy); display:flex; align-items:center; gap:9px; letter-spacing:-0.01em;}
+  .flow-h-tag{font-size:11px; font-weight:700; color:var(--blue); background:var(--blue-soft); padding:3px 9px; border-radius:99px; letter-spacing:.02em;}
+  .flow-h-desc{font-size:13.5px; color:var(--sub); margin-top:4px; line-height:1.55;}
+  .flow-h-desc b{color:var(--ink); font-weight:700;}
+  .flow-note{margin-top:16px; background:#fff; border:1px solid var(--line); border-left:4px solid var(--blue); border-radius:var(--r); padding:15px 18px; box-shadow:var(--shadow-sm);}
+  .fn-title{font-size:14px; font-weight:800; color:var(--blue); margin-bottom:6px;}
+  .fn-body{font-size:13.5px; color:var(--ink); line-height:1.62;}
+  .flow{display:flex; gap:0; align-items:stretch; margin-top:14px; overflow-x:auto; padding-bottom:6px;}
+  .flow-step{flex:1; min-width:150px; position:relative;}
+  .flow-card{border:1.5px solid var(--acc-line); border-radius:14px; overflow:hidden; background:#fff; box-shadow:var(--shadow-sm); height:100%;}
+  .flow-card.dashed{border-style:dashed;}
+  .flow-cap{background:var(--acc); color:#fff; font-weight:800; font-size:13px; letter-spacing:.04em; text-align:center; padding:8px;}
+  .flow-body{padding:12px 12px 14px; text-align:center;}
+  .flow-body .t{font-weight:750; font-size:14px; color:var(--ink);}
+  .flow-body .sp{font-size:12px; color:var(--mute); margin-top:3px;}
+  .flow-flags{display:flex; flex-direction:column; gap:5px; align-items:center; margin-top:9px;}
+  .flow-flags .fl{font-size:11px; font-weight:700; padding:2px 10px; border-radius:99px; border:1.2px solid currentColor;}
+  .flow-arrow{align-self:center; color:var(--mute); padding:0 4px; font-size:18px; flex:none;}
+  @media(max-width:720px){ .flow-arrow{transform:rotate(90deg);} .flow{flex-direction:column;} .flow-step{min-width:0;} }
+
+  /* ============ phases ============ */
+  .filters{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:18px;}
+  .seg{display:inline-flex; background:#fff; border:1px solid var(--line); border-radius:99px; padding:3px; box-shadow:var(--shadow-sm);}
+  .seg button{border:none; background:none; font:inherit; font-size:13px; font-weight:650; color:var(--sub); padding:6px 14px; border-radius:99px; cursor:pointer; transition:.15s; white-space:nowrap;}
+  .seg button.on{background:var(--navy); color:#fff;}
+  .toggle-chip{display:inline-flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--line); border-radius:99px; padding:7px 14px; font-size:13px; font-weight:600; color:var(--sub); cursor:pointer; box-shadow:var(--shadow-sm); transition:.15s; user-select:none;}
+  .toggle-chip.on{border-color:var(--red-line); color:var(--red); background:var(--red-soft);}
+  .toggle-chip .sw{width:30px; height:18px; border-radius:99px; background:#D6DBE4; position:relative; transition:.18s; flex:none;}
+  .toggle-chip .sw::after{content:""; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:#fff; transition:.18s; box-shadow:0 1px 2px rgba(0,0,0,.2);}
+  .toggle-chip.on .sw{background:var(--red);}
+  .toggle-chip.on .sw::after{left:14px;}
+
+  .phase{margin-bottom:18px; border-radius:var(--r-lg); background:#fff; border:1px solid var(--line); box-shadow:var(--shadow); overflow:hidden;}
+  .phase.brk-dim{opacity:.5; filter:saturate(.5);}
+  .ph-head{display:flex; align-items:center; gap:16px; padding:18px 22px; cursor:pointer; border-left:5px solid var(--acc);}
+  .ph-badge{font-weight:850; font-size:13px; letter-spacing:.05em; color:#fff; background:var(--acc); padding:6px 11px; border-radius:8px; flex:none;}
+  .ph-titles{flex:1; min-width:0;}
+  .ph-titles .nm{font-size:18px; font-weight:800; color:var(--navy); letter-spacing:-0.02em;}
+  .ph-titles .tg{font-size:12.5px; color:var(--mute); margin-top:1px;}
+  .ph-prog{display:flex; align-items:center; gap:11px; flex:none;}
+  .ph-ring{position:relative; width:44px; height:44px; flex:none;}
+  .ph-ring svg{transform:rotate(-90deg);}
+  .ph-ring .pct{position:absolute; inset:0; display:grid; place-items:center; font-size:11.5px; font-weight:800; color:var(--acc); font-variant-numeric:tabular-nums;}
+  .ph-cnt{font-size:12.5px; color:var(--sub); white-space:nowrap; min-width:42px; text-align:right;}
+  .ph-chev{color:var(--mute); transition:transform .25s; flex:none; font-size:13px;}
+  .phase.open .ph-chev{transform:rotate(180deg);}
+
+  .ph-body{display:none; padding:4px 22px 22px;}
+  .phase.open .ph-body{display:block;}
+
+  .meta-strip{display:flex; flex-wrap:wrap; gap:8px 10px; padding:14px 0 18px; border-bottom:1px dashed var(--line); margin-bottom:6px;}
+  .meta-strip .m{display:inline-flex; align-items:center; gap:8px; font-size:13px; color:var(--sub);}
+  .meta-strip .m .lab{font-size:11px; font-weight:750; color:#fff; background:var(--acc); padding:3px 9px; border-radius:7px; letter-spacing:.02em;}
+  .meta-strip .m b{color:var(--ink); font-weight:650;}
+  .sev-pill{font-family:var(--mono); font-size:11.5px; font-weight:700; color:#fff; background:var(--red); padding:2px 8px; border-radius:6px;}
+  .sev-pill.none{background:var(--green-soft); color:var(--green); font-family:var(--sans);}
+
+  .panel{border:1px solid var(--line); border-radius:var(--r); margin-top:16px; overflow:hidden;}
+  .panel-head{display:flex; align-items:center; gap:9px; padding:11px 16px; font-size:13.5px; font-weight:750;}
+  .panel.fe .panel-head{background:var(--orange-soft); color:var(--orange);}
+  .panel.dod .panel-head{background:var(--green-soft); color:var(--green);}
+  .panel-head .tag{font-size:11px; font-weight:800; color:#fff; padding:3px 9px; border-radius:99px;}
+  .panel.fe .panel-head .tag{background:var(--orange);}
+  .panel.dod .panel-head .tag{background:var(--green);}
+  .panel-body{padding:8px 8px;}
+
+  /* checkbox + items */
+  .cbx{width:21px; height:21px; border-radius:7px; border:2px solid #CBD2DE; background:#fff; flex:none; cursor:pointer; position:relative; transition:.15s; margin-top:1px;}
+  .cbx:hover{border-color:var(--acc, var(--blue));}
+  .cbx:focus-visible{outline:3px solid var(--blue-soft); outline-offset:2px;}
+  .cbx svg{position:absolute; inset:0; width:100%; height:100%; stroke:#fff; stroke-width:3.2; fill:none; stroke-dasharray:20; stroke-dashoffset:20; transition:stroke-dashoffset .2s;}
+  .is-done .cbx{background:var(--acc, var(--blue)); border-color:var(--acc, var(--blue));}
+  .is-done .cbx svg{stroke-dashoffset:0;}
+
+  .task{display:flex; gap:13px; padding:11px 12px; border-radius:11px; transition:background .15s;}
+  .task + .task{border-top:1px solid var(--line-2);}
+  .task:hover{background:#F8FAFD;}
+  .task-body{flex:1; min-width:0;}
+  .task-head{display:flex; align-items:center; gap:9px; cursor:pointer; flex-wrap:wrap;}
+  .chip{font-size:12px; font-weight:700; padding:3px 9px; border-radius:7px; flex:none;}
+  .chip.code{font-family:var(--mono); color:#fff; background:var(--navy-2);}
+  .chip.issue{color:var(--blue); background:var(--blue-soft);}
+  .chip.issue.new{color:var(--mute); background:#EFF1F5;}
+  .chip.crit{font-size:11px; color:var(--red); background:var(--red-soft);}
+  .chip.high{font-size:11px; color:var(--orange); background:var(--orange-soft);}
+  .chip.med{font-size:11px; color:var(--amber); background:var(--amber-soft);}
+  .chip.std{display:inline-flex; align-items:center; gap:5px; color:var(--c); background:var(--s); font-weight:600;}
+  .chip.std b{font-weight:800;}
+  .chip.std i{width:6px; height:6px; border-radius:50%; background:var(--c); display:inline-block; flex:none;}
+
+  /* GitHub issue badge */
+  .gh-issue{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; color:#24292F; background:#fff;
+    border:1px solid #D0D7DE; border-radius:99px; padding:3px 10px 3px 8px; flex:none; line-height:1.2; white-space:nowrap; text-decoration:none; transition:border-color .15s, background .15s;}
+  a.gh-issue{cursor:pointer;}
+  a.gh-issue:hover{border-color:#0969DA; background:#F3F8FF;}
+  a.gh-issue:hover .num{text-decoration:underline;}
+  .gh-issue svg{width:13px; height:13px; flex:none; color:#1F2328;}
+  .gh-issue .lbl{color:#59636E; font-weight:600;}
+  .gh-issue .num{color:#0969DA; font-weight:800; font-variant-numeric:tabular-nums;}
+
+  /* tag legend */
+  .tag-key{background:#fff; border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow-sm); padding:14px 18px; margin-bottom:16px;}
+  .tk-row{display:flex; flex-wrap:wrap; gap:8px 20px; align-items:center; font-size:13px; color:var(--sub); padding-bottom:12px; border-bottom:1px dashed var(--line);}
+  .tk{display:inline-flex; align-items:center; gap:8px;}
+  .tk-std{display:flex; flex-wrap:wrap; gap:9px 18px; padding-top:12px; font-size:12.5px; color:var(--sub);}
+  .tk-std span{display:inline-flex; align-items:center; gap:7px;}
+  .tk-std b{color:var(--ink); font-weight:700;}
+  .tk-std i{width:11px; height:11px; border-radius:3px; display:inline-block; flex:none;}
+  .task-name{font-size:15px; font-weight:700; color:var(--ink); flex:1; min-width:140px;}
+  .is-done .task-name{color:var(--mute); text-decoration:line-through; text-decoration-color:var(--slate-line);}
+  .task-caret{color:var(--mute); font-size:11px; transition:transform .2s; flex:none;}
+  .task.exp .task-caret{transform:rotate(180deg);}
+  .task-detail{display:none; margin-top:9px; padding-left:2px;}
+  .task.exp .task-detail{display:block;}
+  .task-detail ul{margin:0; padding:0; list-style:none;}
+  .task-detail li{position:relative; padding:4px 0 4px 18px; font-size:13.5px; color:var(--sub); line-height:1.55;}
+  .task-detail li::before{content:""; position:absolute; left:3px; top:12px; width:5px; height:5px; border-radius:2px; background:var(--blue-mid);}
+  .task-detail li code{font-family:var(--mono); font-size:12px; background:#F1F4F9; color:var(--navy); padding:1px 6px; border-radius:5px;}
+  .task-detail li.warn{color:var(--orange); font-weight:600;}
+  .task-detail li.warn::before{display:none;}
+  .task-detail li.warn .wtag{font-family:var(--mono); font-size:11px; font-weight:700; color:#fff; background:var(--orange); padding:1px 7px; border-radius:5px; margin-right:7px;}
+
+  .check-item{display:flex; gap:12px; align-items:flex-start; padding:9px 11px; border-radius:10px; cursor:pointer; transition:background .15s;}
+  .check-item:hover{background:#F8FAFD;}
+  .check-item .check-label{font-size:14px; color:var(--ink); line-height:1.5;}
+  .check-item .check-label code{font-family:var(--mono); font-size:12px; background:#F1F4F9; color:var(--navy); padding:1px 6px; border-radius:5px;}
+  .is-done .check-label{color:var(--mute); text-decoration:line-through; text-decoration-color:var(--slate-line);}
+
+  .hold-list{display:flex; flex-direction:column; gap:9px; margin-top:14px;}
+  .hold{display:flex; gap:11px; align-items:center; padding:11px 14px; background:var(--slate-soft); border:1px solid var(--slate-line); border-radius:11px;}
+  .hold .htag{font-size:11px; font-weight:750; color:#fff; background:var(--slate); padding:2px 9px; border-radius:99px; flex:none;}
+  .hold code{font-family:var(--mono); font-size:12.5px; font-weight:700; color:var(--navy);}
+  .hold .hc{font-size:12.5px; color:var(--sub); margin-left:auto; text-align:right;}
+
+  /* tables */
+  .tbl-wrap{overflow-x:auto; border-radius:var(--r); border:1px solid var(--line); box-shadow:var(--shadow-sm);}
+  table{width:100%; border-collapse:collapse; background:#fff; font-size:13.5px; min-width:540px;}
+  thead th{background:var(--navy); color:#fff; font-weight:700; text-align:left; padding:12px 14px; font-size:12.5px; letter-spacing:.01em;}
+  thead th.c{text-align:center;}
+  tbody td{padding:12px 14px; border-top:1px solid var(--line-2); vertical-align:top;}
+  tbody tr:hover{background:#F8FAFD;}
+  td.c{text-align:center;}
+  td code{font-family:var(--mono); font-size:12px; background:#F1F4F9; color:var(--navy); padding:1px 6px; border-radius:5px; white-space:nowrap;}
+  .tcol-1{font-weight:700; color:var(--navy);}
+  .badge{font-weight:700; font-size:12px; padding:3px 9px; border-radius:7px; display:inline-block;}
+  .badge.red{color:var(--red); background:var(--red-soft);}
+  .badge.green{color:var(--green); background:var(--green-soft);}
+  .badge.orange{color:var(--orange); background:var(--orange-soft);}
+  .badge.slate{color:var(--slate); background:var(--slate-soft);}
+
+  .order-card{margin-top:16px; border-left:4px solid var(--blue); background:var(--blue-soft); border-radius:var(--r); padding:18px 20px;}
+  .order-card h4{margin:0 0 12px; font-size:15px; font-weight:750; color:var(--blue);}
+  .order-flow{display:flex; flex-wrap:wrap; gap:9px; align-items:center; font-size:14px; font-weight:650; color:var(--ink);}
+  .order-flow .on{width:24px; height:24px; border-radius:7px; color:#fff; font-size:12px; font-weight:800; display:grid; place-items:center;}
+  .order-flow .arr{color:var(--mute);}
+  .order-flow .note{font-size:12px; color:var(--sub); font-weight:500;}
+
+  .note-card{border-left:4px solid var(--red); background:var(--red-soft); border-radius:var(--r); padding:16px 20px; margin-top:14px;}
+  .note-card h4{margin:0 0 9px; font-size:14px; font-weight:750; color:var(--red);}
+  .note-card ul{margin:0; padding-left:19px;}
+  .note-card li{font-size:13.5px; color:var(--ink); padding:3px 0;}
+
+  .rel-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  @media(max-width:720px){ .rel-grid{grid-template-columns:1fr;} }
+  .rel{padding:15px 18px; border-radius:var(--r); border:1px solid var(--line); background:#fff; box-shadow:var(--shadow-sm); border-top:3px solid var(--blue);}
+  .rel .rt{font-weight:750; color:var(--navy); font-size:14.5px;}
+  .rel .rd{font-size:13px; color:var(--sub); margin-top:4px;}
+  a.rel-link{text-decoration:none; transition:.15s; cursor:pointer; display:block;}
+  a.rel-link:hover{box-shadow:var(--shadow); transform:translateY(-2px); border-top-color:var(--blue-mid);}
+  .dl-off-tag{font-size:11px; color:var(--mute); background:#F1F4F9; padding:1px 8px; border-radius:99px;}
+
+  /* phase 관련 문서 링크 */
+  .doc-links{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:13px 0 2px;}
+  .dl-label{font-size:11px; font-weight:750; color:#fff; background:var(--navy-2); padding:4px 10px; border-radius:7px; flex:none;}
+  .dl-chip{display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; color:var(--blue); background:var(--blue-soft); border:1px solid var(--blue-line); border-radius:99px; padding:5px 12px; text-decoration:none; transition:.15s;}
+  .dl-chip svg{flex:none;}
+  a.dl-chip:hover{background:#fff; border-color:var(--blue); box-shadow:var(--shadow-sm);}
+  .dl-chip .dl-ext{font-size:11px; color:var(--mute);}
+  .dl-chip.off{color:var(--mute); background:#F1F4F9; border-color:var(--line); cursor:default;}
+
+  footer{margin-top:54px; padding-top:22px; border-top:1px solid var(--line); display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; font-size:12.5px; color:var(--mute);}
+  footer .sep{color:var(--line);}
+
+  .toast{position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px); background:var(--navy); color:#fff; padding:11px 20px; border-radius:99px; font-size:13.5px; font-weight:600; box-shadow:var(--shadow); opacity:0; pointer-events:none; transition:.28s; z-index:80;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .save-status{display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--sub); padding:5px 11px; border-radius:99px; background:var(--blue-soft); white-space:nowrap; flex:none; transition:.2s; cursor:default;}
+  .save-status .ss-dot{width:7px; height:7px; border-radius:50%; background:var(--blue-mid); flex:none;}
+  .save-status.saved{background:#E6F7ED; color:#1A7F47;}
+  .save-status.saved .ss-dot{background:#1A7F47;}
+  .save-status.off{background:#FFF3E0; color:#B26A00;}
+  .save-status.off .ss-dot{background:#E8920C;}
+  @media(max-width:560px){ .save-status .ss-text{display:none;} .save-status{padding:6px;} }
+
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important; scroll-behavior:auto !important;} }
+  @media(max-width:560px){
+    .topbar-in{padding:9px 16px; gap:10px;}
+    .wrap{padding:0 16px 70px;}
+    .opanel{padding:22px 18px;}
+    .phase-mini{grid-template-columns:repeat(2,1fr);}
+    .opanel-num{font-size:38px;}
+    .ph-head{padding:15px 16px; gap:11px;}
+    .ph-body{padding:4px 14px 18px;}
+    .ph-titles .nm{font-size:16px;}
+    .sec-head h2{font-size:20px;}
+    .meta-chips .mchip{font-size:12px;}
+  }
+  @media print{ .topbar,.filters,.btn-reset{display:none;} .phase,.ph-body{break-inside:avoid;} body{background:#fff;} }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-in">
+    <div class="brand"><span class="dot"></span> CARE&nbsp;ID <span style="color:var(--mute);font-weight:600">·</span> <span class="d8">D-8</span></div>
+    <div class="topbar-prog">
+      <div class="mini-track"><div class="mini-fill" id="miniFill"></div></div>
+      <div class="mini-pct" id="miniPct">0%</div>
+    </div>
+    <div class="save-status" id="saveStatus"><span class="ss-dot"></span><span class="ss-text">자동 저장</span></div>
+    <button class="btn-reset" id="btnReset">진행 초기화</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="eyebrow">EU DPP 표준 정렬 · 이행 트래커</div>
+    <h1>스키마 마이그레이션 계획서 <span class="v">D-8</span></h1>
+    <p class="lede">CARE ID 백엔드의 DB 스키마 · API 경로 · 응답 구조를 EU DPP 표준(EN&nbsp;18219 / 18220 / 18222 / 18223)에 맞춰 정렬하는 단계별 이행 계획입니다. 각 항목을 체크하면 Phase별·전체 진행률이 실시간으로 갱신됩니다.</p>
+    <div class="meta-chips">
+      <span class="mchip"><span class="k">작성일</span> <b>2026-06-22</b></span>
+      <span class="mchip"><span class="k">기반</span> <b>D-5 · D-6 · D-7</b></span>
+      <span class="mchip"><span class="k">대상 표준</span> <b>EN 18219·18220·18222·18223</b></span>
+      <span class="mchip"><span class="k">연계 이슈</span> <b>#816–#826</b></span>
+    </div>
+
+    <div class="opanel">
+      <div class="opanel-top">
+        <div>
+          <div class="opanel-num"><span id="ovPct">0</span><small>%</small></div>
+          <div class="opanel-sub">Phase 1–4 전체 이행 진행률 · <span id="ovCnt">0 / 0</span> 항목 완료</div>
+        </div>
+        <div class="lab" style="text-align:right">전체 진행<br><span style="color:#fff;font-weight:700" id="ovState">시작 전</span></div>
+      </div>
+      <div class="big-track"><div class="big-fill" id="bigFill"></div></div>
+      <div class="phase-mini" id="phaseMini"></div>
+    </div>
+  </header>
+
+  <!-- 01 개요 -->
+  <section id="s1">
+    <div class="sec-head"><div class="sec-num">01</div><h2>목적 및 범위</h2></div>
+    <div class="grid-2">
+      <div class="card scope acc-p3">
+        <h3>✓ 포함 범위</h3>
+        <ul>
+          <li>DB 엔티티 컬럼 추가 · 변경</li>
+          <li>API 경로 및 HTTP 메서드 표준화</li>
+          <li>응답 구조(직렬화) 변경</li>
+          <li>식별자 체계 강화</li>
+        </ul>
+      </div>
+      <div class="card scope acc-p5">
+        <h3>○ 범위 외</h3>
+        <ul>
+          <li>EU 레지스트리 <code>PostNewDPPToRegistry</code> <span class="muted">— EU API 스펙 확정 전 보류</span></li>
+          <li>Fine-grained API <code>collections/elements</code> <span class="muted">— ValueElement 선행 후 별도</span></li>
+          <li>보안 · 접근제어 <span class="muted">(EN 18239) — ISO 27001 트랙 별도</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 브레이킹 체인지 -->
+  <section id="s2">
+    <div class="sec-head"><div class="sec-num">02</div><h2>브레이킹 체인지 전체 목록</h2></div>
+
+    <div class="bc-group">
+      <span class="bcg-dot" style="background:var(--red)"></span>
+      <div class="bcg-text">
+        <div class="bcg-title">Breaking Change <span class="bcg-cnt" style="color:var(--red);background:var(--red-soft)">5건</span></div>
+        <div class="bcg-desc">기존 FE·외부 연동이 수정 없이는 동작하지 않는 변경 · FE 수정 필요 <span class="bcg-ref">표기 BC-1~5</span></div>
+      </div>
+    </div>
+    <div class="bc-grid" id="bcList"></div>
+
+    <div class="bc-group mt">
+      <span class="bcg-dot" style="background:var(--green)"></span>
+      <div class="bcg-text">
+        <div class="bcg-title">Non-Breaking Change <span class="bcg-cnt" style="color:var(--green);background:var(--green-soft)">8건</span></div>
+        <div class="bcg-desc">기존 코드 수정 없이 그대로 동작 — 신규 컬럼·경로·검증 추가 위주 <span class="bcg-ref">표기 NBC-1~8</span></div>
+      </div>
+    </div>
+    <div class="bc-grid" id="nbcList"></div>
+  </section>
+
+  <!-- 03 선행 관계 -->
+  <section id="s3">
+    <div class="sec-head"><div class="sec-num">03</div><h2>선행 관계</h2><span class="sub">노드에 마우스를 올리면 의존 경로가 강조됩니다</span></div>
+    <div class="depwrap">
+      <div id="depGraph"></div>
+      <div class="dep-legend">
+        <span><i style="background:var(--blue)"></i>Phase 1</span>
+        <span><i style="background:var(--navy)"></i>Phase 2</span>
+        <span><i style="background:var(--green)"></i>Phase 3</span>
+        <span><i style="background:var(--orange)"></i>Phase 4</span>
+        <span><i style="background:var(--slate)"></i>Phase 5 (보류)</span>
+      </div>
+    </div>
+    <div class="flow-head">
+      <div class="flow-h-title">권장 실행 순서 <span class="flow-h-tag">Phase Flow</span></div>
+      <div class="flow-h-desc">의존 관계·FE 협의를 고려한 <b>Phase 착수 순서</b> — 번호 순(1·2·3)이 아니라 실제로 진행하는 순서입니다. 위 그래프가 이슈 단위 선후관계라면, 아래는 Phase 단위 실행 순서입니다.</div>
+    </div>
+    <div class="flow" id="flow"></div>
+    <div class="flow-note">
+      <div class="fn-title">왜 이 순서인가?</div>
+      <div class="fn-body">Phase 2·3·4는 서로 의존하지 않고 <b>모두 Phase 1만 끝나면 시작</b>할 수 있어, 순서는 전략적 선택입니다. Phase 1(기반) 이후 <b style="color:var(--green)">비파괴 · FE 협의 불필요</b>한 <b>Phase 3</b>을 곧바로 진행하고(블로커 없음), <b style="color:var(--red)">브레이킹 · FE 협의 필요</b>한 <b>Phase 2·4</b>는 프론트엔드 협의가 끝난 뒤 착수합니다. → 협의를 기다리는 동안 막힘없는 작업(Phase 3)을 먼저 끝내 전체 일정을 단축하는 병렬화 전략입니다.</div>
+    </div>
+  </section>
+
+  <!-- 04 단계별 이행 계획 -->
+  <section id="s4">
+    <div class="sec-head"><div class="sec-num">04</div><h2>단계별 이행 계획</h2></div>
+    <div class="tag-key">
+      <div class="tk-row">
+        <span class="tk"><span class="chip code">1-A</span> 작업 번호</span>
+        <span class="tk"><span class="gh-issue"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span class="lbl">Issue</span><span class="num">#000</span></span> GitHub 이슈 (작업 추적)</span>
+        <span class="tk"><span class="chip std" style="--c:#4F46E5;--s:#ECEBFB"><i></i><b>EN 000</b></span> 관련 EU 표준 <span style="color:var(--mute);font-size:12px">(복수 가능)</span></span>
+      </div>
+      <div class="tk-std">
+        <span><i style="background:#4F46E5"></i><b>EN 18222</b> · API (REST 경로·메서드)</span>
+        <span><i style="background:#C2298A"></i><b>EN 18223</b> · 데이터 모델 (응답 구조·필수 속성)</span>
+        <span><i style="background:#7C5CE6"></i><b>EN 18219</b> · 식별자 (GTIN·LEI·계층)</span>
+        <span><i style="background:#0E9488"></i><b>EN 18220</b> · 데이터 캐리어 (QR·NFC)</span>
+      </div>
+    </div>
+    <div class="filters">
+      <div class="seg" id="segView">
+        <button data-v="all" class="on">전체 보기</button>
+        <button data-v="todo">미완료만</button>
+      </div>
+      <div class="toggle-chip" id="brkToggle"><span class="sw"></span> 브레이킹 Phase만 강조</div>
+    </div>
+    <div id="phases"></div>
+  </section>
+
+  <!-- 05 일정 요약 -->
+  <section id="s5">
+    <div class="sec-head"><div class="sec-num">05</div><h2>전체 일정 요약</h2></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Phase</th><th>주요 내용</th><th class="c">브레이킹</th><th class="c">FE 협의</th><th class="c">선행</th></tr></thead>
+        <tbody id="schBody"></tbody>
+      </table>
+    </div>
+    <div class="order-card">
+      <h4>권장 실행 순서</h4>
+      <div class="order-flow">
+        <span class="on" style="background:var(--blue)">1</span> Phase 1 <span class="arr">→</span>
+        <span class="on" style="background:var(--green)">3</span> Phase 3 <span class="note">(병렬 가능)</span> <span class="arr">→</span>
+        <span class="on" style="background:var(--navy)">2</span> Phase 2 <span class="note">(FE 협의 후)</span> <span class="arr">→</span>
+        <span class="on" style="background:var(--orange)">4</span> Phase 4 <span class="note">(FE 협의 후)</span> <span class="arr">→</span>
+        <span class="on" style="background:var(--slate)">5</span> Phase 5 <span class="note">(보류)</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 DoD -->
+  <section id="s6">
+    <div class="sec-head"><div class="sec-num">06</div><h2>완료 기준</h2><span class="sub">전체 마이그레이션 릴리스 게이트</span></div>
+    <div class="phase acc-p1 open" style="margin-bottom:0">
+      <div class="ph-head" style="cursor:default">
+        <div class="ph-titles"><div class="nm">Definition of Done</div><div class="tg">아래 7개 조건 충족 시 마이그레이션 완료</div></div>
+        <div class="ph-prog">
+          <div class="ph-ring" id="dodRing"></div>
+          <div class="ph-cnt" id="dodCnt">0/7</div>
+        </div>
+      </div>
+      <div class="ph-body" style="display:block">
+        <div class="panel-body" id="finalDod" style="padding-top:8px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 07 연계 문서 -->
+  <section id="s8">
+    <div class="sec-head"><div class="sec-num">07</div><h2>연계 문서</h2></div>
+    <div class="rel-grid" id="relList"></div>
+  </section>
+
+  <footer>
+    <span><b style="color:var(--navy)">YUNE Inc.</b> 윤회주식회사</span><span class="sep">·</span>
+    <span>CARE ID</span><span class="sep">·</span>
+    <span>D-8 스키마 마이그레이션 계획서</span><span class="sep">·</span>
+    <span>2026-06-22</span>
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ============================ DATA ============================ */
+const PHASE_META = {
+  1:{key:'p1', color:'var(--blue)'},  2:{key:'p2', color:'var(--navy)'},
+  3:{key:'p3', color:'var(--green)'}, 4:{key:'p4', color:'var(--orange)'}, 5:{key:'p5', color:'var(--slate)'}
+};
+/* EU 표준 메타 (Phase 색과 구분되는 별도 색 축) */
+const STD = {
+  '18219':{label:'EN 18219', desc:'식별자',        color:'#7C5CE6', soft:'#F0ECFB'},
+  '18220':{label:'EN 18220', desc:'데이터 캐리어', color:'#0E9488', soft:'#E1F4F1'},
+  '18222':{label:'EN 18222', desc:'API',           color:'#4F46E5', soft:'#ECEBFB'},
+  '18223':{label:'EN 18223', desc:'데이터 모델',   color:'#C2298A', soft:'#FAE9F3'},
+};
+/* 각 작업이 구현하는 표준 (복수 표준에 공통 해당 시 배열) */
+const STD_BY_CODE = {
+  '1-A':'18223', '1-B':['18222','18223'], '1-C':'18219',
+  '2-A':'18222','2-B':'18222','2-C':'18222','2-D':'18222',
+  '3-A':'18219','3-B':'18219','3-C':'18219','3-D':'18219',
+  '4-A':'18223','4-B':'18220',
+};
+/* ════════════════════════════════════════════════════════════
+   GitHub 저장소 주소 — 아래 한 줄만 실제 repo 주소로 바꾸면
+   모든 이슈 뱃지가 해당 저장소의 이슈로 연결됩니다.
+   예: 'https://github.com/yune-inc/care-id'
+   ════════════════════════════════════════════════════════════ */
+const GH_REPO='https://github.com/Yune-inc/careid-v2-backend-nestjs';
+
+/* GitHub octocat mark + 이슈 뱃지 */
+const GH_PATH='M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z';
+const GH_MARK='<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="'+GH_PATH+'"/></svg>';
+function ghIssue(num){ const url=GH_REPO+'/issues/'+String(num).replace('#',''); return `<a class="gh-issue" href="${url}" target="_blank" rel="noopener noreferrer" title="GitHub 이슈 ${num} 열기" onclick="event.stopPropagation()">${GH_MARK}<span class="lbl">Issue</span><span class="num">${num}</span></a>`; }
+/* SVG 내부에 그릴 옥토캣 (그래프 노드용) */
+function ghMarkSvg(x,y,s,color){ return `<g transform="translate(${x},${y}) scale(${s})"><path fill="${color}" d="${GH_PATH}"/></g>`; }
+/* 문서 링크 아이콘 */
+const DOC_ICON='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+const DATA = {
+  bc:[
+    {id:'BC-1', html:'<code>GET /product/:id</code> → <code>GET /dppsByProductId/{productId}</code> 경로 변경', scope:'FE dppAxios URL 수정', iss:'#817'},
+    {id:'BC-2', html:'<code>GET /products/:uuid/:size</code> → <code>GET /dpps/{dppId}</code> (size 파라미터 제거)', scope:'FE dppAxios URL 수정', iss:'#817'},
+    {id:'BC-3', html:'<code>product_identifier_type</code> 자유 텍스트 → Enum 전환 ("url" → "URL" 등)', scope:'FE 값 비교 코드 수정', iss:'#823'},
+    {id:'BC-4', html:'응답에 <code>granularity</code>, <code>dppStatus</code>, <code>economicOperatorId</code> 필수 필드 추가', scope:'FE 타입 정의 확장', iss:'#816'},
+    {id:'BC-5', html:'<code>weight: 250</code> → <code>weight: {value:250, unitCode:"g"}</code> 구조 변경', scope:'FE 수치 파싱 코드 수정', iss:'#819'},
+  ],
+  nbc:[
+    {id:'NBC-1', html:'DB 컬럼 추가 — <code>granularity</code>, <code>dpp_schema_version</code>, <code>dpp_lifecycle_status</code>, <code>economic_operator_id</code>, <code>registry_identifier</code> (모두 nullable)', iss:'#816'},
+    {id:'NBC-2', html:'HistoryLog 컬럼 추가 — <code>changed_fields</code>, <code>actor_type</code>, <code>change_reason</code>', iss:'#818'},
+    {id:'NBC-3', html:'표준 경로 신규 추가 — <code>GET /dpps/{dppId}</code>, <code>GET /dppsByProductId/{productId}</code> (기존 경로 병렬 유지)', iss:'#817'},
+    {id:'NBC-4', html:'<code>POST /dpps</code> 신규 추가 (기존 어드민 API와 병렬)', iss:'신규'},
+    {id:'NBC-5', html:'<code>PATCH /dpps/{dppId}</code> 신규 추가', iss:'신규'},
+    {id:'NBC-6', html:'<code>gtin</code> 필드 추가 (nullable, 기존 product_id와 별도)', iss:'#821'},
+    {id:'NBC-7', html:'LEI 유효성 검증 추가 (기존 필드에 validator 적용)', iss:'#822'},
+    {id:'NBC-8', html:'QR 최소 크기 검증 추가 (기존 API에 파라미터 validator 추가)', iss:'#826'},
+  ],
+  phases:[
+    { n:1, docs:['interop'], name:'DB 스키마 확장', tag:'Non-breaking 선행', goal:'브레이킹 없이 표준 필드 기반 마련', sprint:'1~2 스프린트', breaking:[], pre:'없음',
+      fe:null,
+      tasks:[
+        {code:'1-A', iss:'#816', name:'DPP 엔티티 필수 속성 추가', items:[
+          {c:'추가 컬럼: <code>granularity ENUM(\'MODEL\',\'BATCH\',\'ARTICLE\') NULL</code>'},
+          {c:'추가 컬럼: <code>dpp_schema_version VARCHAR(20) NULL</code>'},
+          {c:'추가 컬럼: <code>dpp_lifecycle_status ENUM(\'ACTIVE\',\'INACTIVE\',\'DRAFT\',\'ARCHIVED\') NULL</code>'},
+          {c:'추가 컬럼: <code>economic_operator_id VARCHAR(100) NULL</code>'},
+          {c:'추가 컬럼: <code>registry_identifier VARCHAR(255) NULL</code>'},
+        ]},
+        {code:'1-B', iss:'#818', name:'HistoryLog 변경 이력 강화', items:[
+          {c:'추가 컬럼: <code>changed_fields JSON NULL</code>'},
+          {c:'추가 컬럼: <code>actor_type ENUM(\'USER\',\'SYSTEM\',\'API\') NULL</code>'},
+          {c:'추가 컬럼: <code>change_reason VARCHAR(500) NULL</code>'},
+          {c:'UpdateDPP 호출 시 변경 이력 자동 기록'},
+        ]},
+        {code:'1-C', iss:'#823', name:'product_identifier_type Enum 통일', items:[
+          {c:'<code>product_identifier_type</code> 자유 텍스트 → Enum 전환'},
+          {c:'정규화: "url"/"URL"/"web_url" → URL, "gtin"/"GTIN" → GS1_GTIN'},
+          {c:'매핑 불가 값 → OTHER'},
+          {warn:'BC-3', c:'FE에서 identifier_type 값 비교 코드 확인 필요'},
+        ]},
+      ],
+      dod:['TypeORM 마이그레이션 성공','기존 데이터 정합성 확인 쿼리 통과','단위 테스트 통과'],
+    },
+    { n:2, docs:['api'], name:'API 경로 표준화', tag:'Breaking 포함', goal:'EN 18222 표준 REST 경로 구현, 기존 경로 병렬 유지(Deprecation)', sprint:'1~2 스프린트', breaking:['BC-1','BC-2','BC-4'], pre:'Phase 1 완료',
+      fe:{ title:'Phase 2 시작 전 반드시 확인', items:[
+        'FE <code>GET /product/:id</code> → <code>GET /dppsByProductId/{productId}</code> 전환 일정 합의',
+        'FE <code>GET /products/:uuid/:size</code> → <code>GET /dpps/{dppId}</code> 전환 일정 합의',
+        'FE 응답 타입에 granularity, dppStatus 필드 추가 확인',
+        'Deprecation 헤더 처리 — FE에서 무시 또는 로그 처리 확인',
+      ]},
+      tasks:[
+        {code:'2-A', iss:'#817', name:'표준 URI 엔드포인트 구현', items:[
+          {c:'신규: <code>GET /dpps/{dppId}</code> (ReadDPPById)'},
+          {c:'신규: <code>GET /dppsByProductId/{productId}</code> (ReadDPPByProductId)'},
+          {c:'응답에 EN 18223 Tabelle 1 필수 8개 필드 포함'},
+          {c:'기존 <code>GET /products/:uuid/:size</code> 유지 + Deprecation 헤더'},
+          {c:'기존 <code>GET /product/:id</code> 유지 + Deprecation 헤더'},
+          {c:'Deprecation 헤더: <code>Deprecation: true, Sunset: 2027-01-01</code>'},
+        ]},
+        {code:'2-B', iss:'신규', name:'CreateDPP 표준 경로 공개', items:[
+          {c:'신규: <code>POST /dpps</code> (기존 어드민 로직 재사용)'},
+          {c:'JWT 인증 + brand 역할 Guard 적용'},
+          {c:'EN 18222 Table 5 응답 구조 (statusCode + dppId URI)'},
+        ]},
+        {code:'2-C', iss:'신규', name:'UpdateDPPById 구현', items:[
+          {c:'신규: <code>PATCH /dpps/{dppId}</code>'},
+          {c:'RFC 7396 JSON Merge Patch 지원'},
+          {c:'<code>Content-Type: application/merge-patch+json</code>'},
+          {c:'변경 실패 시 전체 롤백 (<code>@Transactional</code>)'},
+          {c:'HistoryLog 자동 기록 (#818 연동)'},
+        ]},
+        {code:'2-D', iss:'신규', name:'ReadDPPVersionByProductIdAndDate 구현', items:[
+          {c:'신규: <code>GET /dppsByProductIdAndDate/{productId}?date={timestamp}</code>'},
+          {c:'HistoryLog 기반 시점 조회'},
+          {c:'date 파라미터: ISO 8601 UTC'},
+        ]},
+      ],
+      dod:['Postman 컬렉션으로 표준 경로 전체 응답 검증','기존 경로 정상 동작 유지 확인','Deprecation 헤더 포함 확인','FE 팀 승인'],
+    },
+    { n:3, docs:['idc'], name:'식별자 체계 강화', tag:'Non-breaking · 신규 필드', goal:'EN 18219 글로벌 유일성 · 조직 식별자 표준 충족', sprint:'1~2 스프린트', breaking:[], pre:'Phase 1 완료 (#816, #823)',
+      fe:null,
+      tasks:[
+        {code:'3-A', iss:'#821', sev:'crit', name:'글로벌 유일성 ID 체계', items:[
+          {c:'추가 컬럼: <code>gtin VARCHAR(14) NULL</code> (GS1 GTIN)'},
+          {c:'GTIN 체크 디지트 유효성 검증 (GS1 mod-10)'},
+          {c:'응답에 <code>productIdentifier: {type, value, schemaUrl}</code> 구조 추가'},
+          {c:'GTIN 없는 제품: URI 폴백 직렬화'},
+        ]},
+        {code:'3-B', iss:'#822', sev:'high', name:'LEI 유효성 검증', items:[
+          {c:'<code>economic_operator_id</code>에 LEI 형식 검증 적용'},
+          {c:'LEI: 20자리 ISO 17442 (ISO 7064 MOD 97-10 체크 디지트)'},
+          {c:'GLEIF API 조회 서비스 구현 (Redis 캐싱 TTL 24h)'},
+          {c:'GLEIF 조회 실패 시 경고만 반환, 저장은 허용'},
+        ]},
+        {code:'3-C', iss:'#824', sev:'med', name:'제품 ID 계층 구조 정의', items:[
+          {c:'추가 컬럼: <code>product_id_level ENUM(\'MODEL\',\'BATCH\',\'ARTICLE\') NULL</code>'},
+          {c:'추가 컬럼: <code>parent_product_id VARCHAR(255) NULL</code>'},
+          {c:'계층 유효성 검증: Batch → Model 존재 확인'},
+          {c:'신규: <code>GET /dpps/{id}/hierarchy</code> 엔드포인트'},
+        ]},
+        {code:'3-D', iss:'#825', name:'ProductID 스키마 타입 메타데이터', items:[
+          {c:'<code>SCHEMA_URL_MAP</code> 상수 정의 (ProductIdentifierType → URL)'},
+          {c:'응답 DTO에 <code>productIdSchema</code> 필드 자동 직렬화'},
+          {c:'DB 저장 불필요 (직렬화 레이어에서 처리)'},
+        ]},
+      ],
+      dod:['GTIN 유효성 검증 단위 테스트 통과','LEI 형식 유효성 검증 단위 테스트 통과','응답 productIdentifier 구조 스키마 검증'],
+    },
+    { n:4, docs:['interop','idc'], name:'응답 구조 표준화', tag:'Breaking 포함', goal:'EN 18223 ValueElement 구조 적용, QR 검증 강화', sprint:'1 스프린트', breaking:['BC-5'], pre:'Phase 1 완료',
+      fe:{ title:'Phase 4 시작 전 확인', items:[
+        'FE에서 수치 필드 파싱 방식 변경 확인 (250 → {value: 250, unitCode: "g"})',
+        '영향받는 수치 필드 목록 공유 및 FE 타입 수정 일정 합의',
+      ]},
+      tasks:[
+        {code:'4-A', iss:'#819', name:'ValueElement unitCode · tolerance 지원', items:[
+          {c:'방식 A 권장: DB는 유지, 응답 직렬화 레이어에서 ValueElement 구조로 변환'},
+          {c:'단위코드 매핑 상수 정의 (<code>UNIT_CODE_MAP</code>)'},
+          {c:'대상 필드: weight → "g", recycled_content → "%", carbon_footprint → "kg CO2e" 등'},
+          {c:'tolerance: 초기 null, 이후 브랜드 입력 가능하도록 확장'},
+          {warn:'BC-5', c:'FE 수치 파싱 코드 일괄 수정 필요'},
+        ]},
+        {code:'4-B', iss:'#826', name:'QR 코드 최소 크기 검증', items:[
+          {c:'QR 생성 DTO에 size 최솟값 63px 검증 추가'},
+          {c:'기본값 300px 설정'},
+          {c:'10mm 미만 물리 크기 시 경고 헤더 추가'},
+        ]},
+      ],
+      dod:['ValueElement 응답 구조 스키마 검증','QR 최소 크기 검증 단위 테스트 통과','FE 팀 수치 파싱 수정 완료 확인'],
+    },
+    { n:5, docs:['scan','interop'], name:'보류 (외부 의존 · 장기)', tag:'외부 확정 후 구현', goal:'EU 레지스트리 API 스펙 공식 확정 및 DataElementCollection 구조 설계 완료 후', sprint:'미정', breaking:[], pre:'EU 스펙 확정', deferred:true,
+      fe:null, tasks:[], dod:[],
+      holds:[
+        {code:'PostNewDPPToRegistry', cond:'EU 레지스트리 API 스펙 확정 후'},
+        {code:'ReadDPPIdsByProductIds', cond:'B2B 연동 필요 시'},
+        {code:'Fine-grained API (/dpps/{id}/collections, /elements)', cond:'#819 완료 후'},
+        {code:'DeleteDPPById', cond:'생애주기 종료 정책 수립 후'},
+      ],
+    },
+  ],
+  schedule:[
+    {ph:'Phase 1', col:'var(--blue)',  desc:'DB 컬럼 추가, Enum 전환', brk:'BC-3만', brkCls:'orange', fe:'최소', feCls:'slate', pre:'없음'},
+    {ph:'Phase 2', col:'var(--navy)',  desc:'API 경로 표준화', brk:'BC-1·2·4', brkCls:'red', fe:'필수', feCls:'red', pre:'Phase 1'},
+    {ph:'Phase 3', col:'var(--green)', desc:'식별자 체계 강화', brk:'없음', brkCls:'green', fe:'불필요', feCls:'green', pre:'Phase 1'},
+    {ph:'Phase 4', col:'var(--orange)',desc:'응답 구조 표준화', brk:'BC-5', brkCls:'red', fe:'필수', feCls:'red', pre:'Phase 1'},
+    {ph:'Phase 5', col:'var(--slate)', desc:'레지스트리·벌크 API', brk:'없음', brkCls:'green', fe:'별도', feCls:'slate', pre:'EU 스펙'},
+  ],
+  finalDod:[
+    'EN 18222 API 대조표 기준 <b>충족 2 → 충족 7 이상</b> (Phase 1~4 완료 시)',
+    'EN 18223 Tabelle 1 <b>필수 8개 속성 전체</b> 응답 포함',
+    'EN 18219 <b>Critical 2개, High 5개</b> 이슈 해결',
+    '기존 API 경로 <b>Deprecation 헤더 적용</b> (Sunset 명시)',
+    'FE 스테이징 환경에서 <b>BC 항목 전체 검증 완료</b>',
+    'TypeORM 마이그레이션 파일 전체 <b>idempotent 확인</b> (재실행 안전)',
+    '브레이킹 체인지 5개 항목 <b>FE 수정 완료 및 배포 확인</b>',
+  ],
+  related:[
+    {id:'checklist', t:'EU DPP 표준 대응 체크리스트', d:'EN 18219~18223 전체 대응 현황 (스프레드시트)', url:'https://docs.google.com/spreadsheets/d/1z9dl27vMgJPgdShmSU9sCyOJFcIidLPma5puGAY9u30/edit?gid=1091047627#gid=1091047627'},
+    {id:'api',     t:'API 대조 + OpenAPI 초안', d:'EN 18222 표준 경로 전체 스펙', url:'https://docs.google.com/document/d/1p1YB3Toxvk_Ah4rZDnDo_dzdziUVVF77/edit?usp=drive_link'},
+    {id:'interop', t:'상호운용성 · 레지스트리 연동 점검', d:'EN 18223 Gap 분석', url:'https://docs.google.com/document/d/1buFM0wh4h1LFcDnE1xqjmcbsEJV1b-Bx/edit?usp=drive_link'},
+    {id:'idc',     t:'식별자 · 캐리어 정합성 리포트', d:'EN 18219 · 18220 Gap 분석', url:'https://docs.google.com/document/d/1Th9u_aBNhGZ2QFX1kijUgM9CyWPrBE6Q/edit?usp=drive_link'},
+    {id:'scan',    t:'9월 표준 사전 스캔', d:'EN 18239 · 18246 보안 요건', url:''},
+    {id:'gh',      t:'GitHub Issues #816 ~ #826', d:'개별 구현 이슈', url:GH_REPO+'/issues'},
+  ],
+};
+
+/* ===================== STATE (in-memory + guarded localStorage) ===================== */
+const STORE_KEY='careid-d8-tracker-v1';
+let state = (function(){ try{ const r=localStorage.getItem(STORE_KEY); return r?JSON.parse(r):{}; }catch(e){ return {}; } })();
+function persist(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); return true; }catch(e){ return false; } }
+const STORAGE_OK = (function(){ try{ const k='__careid_test'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return true; }catch(e){ return false; } })();
+const isDone = id => !!state[id];
+function setDone(id, v){ if(v) state[id]=1; else delete state[id]; persist(); }
+
+const CHECK_SVG = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>';
+const el = (tag, cls, html) => { const e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; };
+
+/* collect checkable ids per phase (tasks + fe + dod), phase 5 excluded from overall */
+function phaseItemIds(p){
+  const ids=[];
+  (p.tasks||[]).forEach(t=> ids.push('t:'+t.code));
+  if(p.fe) p.fe.items.forEach((_,i)=> ids.push('fe:'+p.n+':'+i));
+  (p.dod||[]).forEach((_,i)=> ids.push('dod:'+p.n+':'+i));
+  return ids;
+}
+const overallPhases = DATA.phases.filter(p=>!p.deferred);
+const finalDodIds = DATA.finalDod.map((_,i)=>'fdod:'+i);
+const relById = Object.fromEntries(DATA.related.map(r=>[r.id, r]));
+
+/* ===================== RENDER: severity reference ===================== */
+function renderBC(){
+  const bcEl=document.getElementById('bcList');
+  DATA.bc.forEach(b=>{
+    const n=b.id.split('-')[1];
+    bcEl.appendChild(el('div','bc-row sev-bc',
+      `<div class="bc-tag" title="${b.id}">${n}</div><div class="bc-main"><div class="bc-change">${b.html}</div>
+       <div class="bc-foot"><span class="pill">영향: ${b.scope}</span>${ghIssue(b.iss)}</div></div>`));
+  });
+  const nbcEl=document.getElementById('nbcList');
+  DATA.nbc.forEach(b=>{
+    const n=b.id.split('-')[1];
+    const issEl = b.iss==='신규' ? '<span class="chip issue new">신규</span>' : ghIssue(b.iss);
+    nbcEl.appendChild(el('div','bc-row sev-nbc',
+      `<div class="bc-tag" title="${b.id}">${n}</div><div class="bc-main"><div class="bc-change">${b.html}</div>
+       <div class="bc-foot">${issEl}</div></div>`));
+  });
+}
+
+/* ===================== RENDER: phases ===================== */
+function ring(size, color){
+  const r=(size-6)/2, c=2*Math.PI*r;
+  return `<svg width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="#E3E8F0" stroke-width="4"/>
+    <circle class="rfill" cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="4" stroke-linecap="round"
+      stroke-dasharray="${c}" stroke-dashoffset="${c}"/></svg>`;
+}
+function renderPhases(){
+  const host=document.getElementById('phases');
+  DATA.phases.forEach(p=>{
+    const m=PHASE_META[p.n];
+    const phase=el('div','phase acc-'+m.key+(p.deferred?'':' open'));
+    phase.dataset.n=p.n; phase.dataset.brk=(p.breaking.length>0)?'1':'0';
+
+    // head
+    const head=el('div','ph-head');
+    const brkPills = p.breaking.length ? p.breaking.map(x=>`<span class="sev-pill">${x}</span>`).join(' ') : '';
+    head.innerHTML =
+      `<div class="ph-badge">PHASE ${p.n}</div>
+       <div class="ph-titles"><div class="nm">${p.name}</div><div class="tg">${p.tag}</div></div>
+       <div class="ph-prog">
+         ${p.deferred?'<span class="sev-pill none" style="background:var(--slate-soft);color:var(--slate)">보류</span>'
+           :`<div class="ph-ring">${ring(44,m.color)}<span class="pct">0%</span></div><div class="ph-cnt">0/0</div>`}
+         <span class="ph-chev">▼</span>
+       </div>`;
+    phase.appendChild(head);
+
+    // body
+    const body=el('div','ph-body');
+    const meta=el('div','meta-strip');
+    meta.innerHTML =
+      `<span class="m"><span class="lab">목표</span> <b>${p.goal}</b></span>`+
+      `<span class="m" title="스프린트 = 개발 주기(보통 1~2주 단위). 작업량 추정치이며 확정 마감일은 아닙니다."><span class="lab">소요</span> <b>${p.sprint}</b></span>`+
+      `<span class="m"><span class="lab">브레이킹</span> ${p.breaking.length?brkPills:'<span class="sev-pill none">없음</span>'}</span>`+
+      `<span class="m"><span class="lab">선행</span> <b>${p.pre}</b></span>`;
+    body.appendChild(meta);
+
+    // 관련 문서 링크
+    if(p.docs && p.docs.length){
+      const dl=el('div','doc-links');
+      dl.innerHTML='<span class="dl-label">관련 문서</span>'+p.docs.map(id=>{
+        const d=relById[id]; if(!d) return '';
+        return d.url
+          ? `<a class="dl-chip" href="${d.url}" target="_blank" rel="noopener" title="${d.t} 열기">${DOC_ICON}<span>${d.t}</span><span class="dl-ext">↗</span></a>`
+          : `<span class="dl-chip off" title="문서 URL 미설정 — 상단 related 목록의 url에 추가하세요">${DOC_ICON}<span>${d.t}</span></span>`;
+      }).join('');
+      body.appendChild(dl);
+    }
+
+    // FE panel
+    if(p.fe){
+      const panel=el('div','panel fe');
+      panel.innerHTML=`<div class="panel-head"><span class="tag">FE 협의 필수</span> ${p.fe.title}</div>`;
+      const pb=el('div','panel-body');
+      p.fe.items.forEach((it,i)=> pb.appendChild(checkItem('fe:'+p.n+':'+i, it, m.key)));
+      panel.appendChild(pb); body.appendChild(panel);
+    }
+
+    // tasks
+    (p.tasks||[]).forEach(t=> body.appendChild(taskEl(t, m.key)));
+
+    // hold items (phase 5)
+    if(p.holds){
+      const hl=el('div','hold-list');
+      p.holds.forEach(h=> hl.appendChild(el('div','hold',
+        `<span class="htag">보류</span><code>${h.code}</code><span class="hc">${h.cond}</span>`)));
+      body.appendChild(hl);
+    }
+
+    // DoD panel
+    if((p.dod||[]).length){
+      const panel=el('div','panel dod');
+      panel.innerHTML=`<div class="panel-head"><span class="tag">완료 기준</span> Definition of Done</div>`;
+      const pb=el('div','panel-body');
+      p.dod.forEach((it,i)=> pb.appendChild(checkItem('dod:'+p.n+':'+i, it, m.key)));
+      panel.appendChild(pb); body.appendChild(panel);
+    }
+
+    phase.appendChild(body);
+    host.appendChild(phase);
+
+    // head toggle (collapse) — but ring/cnt clicks shouldn't matter
+    head.addEventListener('click',()=> phase.classList.toggle('open'));
+  });
+}
+
+function severityChip(sev){
+  if(sev==='crit') return '<span class="chip crit">Critical</span>';
+  if(sev==='high') return '<span class="chip high">High</span>';
+  if(sev==='med')  return '<span class="chip med">Medium</span>';
+  return '';
+}
+function stdChips(val){
+  if(!val) return '';
+  const arr = Array.isArray(val) ? val : [val];
+  return arr.map(key=>{
+    const s=STD[key]; if(!s) return '';
+    const d = s.desc ? ` · ${s.desc}` : '';
+    return `<span class="chip std" style="--c:${s.color};--s:${s.soft}" title="관련 EU 표준"><i></i><b>${s.label}</b>${d}</span>`;
+  }).join('');
+}
+function taskEl(t, accKey){
+  const id='t:'+t.code;
+  const wrap=el('div','task'+(isDone(id)?' is-done':''));
+  wrap.dataset.id=id;
+  let detail='<ul>';
+  t.items.forEach(it=>{
+    if(it.warn) detail+=`<li class="warn"><span class="wtag">주의 ${it.warn}</span>${it.c}</li>`;
+    else detail+=`<li>${it.c}</li>`;
+  });
+  detail+='</ul>';
+  const issEl = t.iss==='신규' ? '<span class="chip issue new" title="신규 작업">신규</span>' : ghIssue(t.iss);
+  wrap.innerHTML =
+    `<div class="cbx" role="checkbox" tabindex="0" aria-checked="${isDone(id)}">${CHECK_SVG}</div>
+     <div class="task-body">
+       <div class="task-head">
+         <span class="chip code">${t.code}</span>
+         ${issEl}
+         ${stdChips(STD_BY_CODE[t.code])}
+         ${severityChip(t.sev)}
+         <span class="task-name">${t.name}</span>
+         <span class="task-caret">▼</span>
+       </div>
+       <div class="task-detail">${detail}</div>
+     </div>`;
+  const cbx=wrap.querySelector('.cbx');
+  const headRow=wrap.querySelector('.task-head');
+  cbx.addEventListener('click', e=>{ e.stopPropagation(); toggle(wrap, id); });
+  cbx.addEventListener('keydown', e=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); toggle(wrap,id);} });
+  headRow.addEventListener('click', ()=> wrap.classList.toggle('exp'));
+  return wrap;
+}
+function checkItem(id, labelHtml, accKey){
+  const wrap=el('div','check-item'+(isDone(id)?' is-done':''));
+  wrap.dataset.id=id;
+  wrap.innerHTML=`<div class="cbx" role="checkbox" tabindex="0" aria-checked="${isDone(id)}">${CHECK_SVG}</div><span class="check-label">${labelHtml}</span>`;
+  const cbx=wrap.querySelector('.cbx');
+  wrap.addEventListener('click', ()=> toggle(wrap,id));
+  cbx.addEventListener('keydown', e=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); toggle(wrap,id);} });
+  return wrap;
+}
+function toggle(wrap, id){
+  const now=!isDone(id);
+  setDone(id, now);
+  wrap.classList.toggle('is-done', now);
+  const cbx=wrap.querySelector('.cbx'); if(cbx) cbx.setAttribute('aria-checked', now);
+  updateProgress();
+  applyView();
+  flashSaved();
+}
+
+/* ===================== RENDER: tables / lists ===================== */
+function renderTables(){
+  const sb=document.getElementById('schBody');
+  DATA.schedule.forEach(s=> sb.appendChild(el('tr',null,
+    `<td class="c" style="font-weight:800;color:${s.col}">${s.ph}</td><td>${s.desc}</td>
+     <td class="c"><span class="badge ${s.brkCls}">${s.brk}</span></td>
+     <td class="c"><span class="badge ${s.feCls}">${s.fe}</span></td>
+     <td class="c" style="color:var(--sub)">${s.pre}</td>`)));
+  const rel=document.getElementById('relList');
+  DATA.related.forEach(d=>{
+    if(d.url){
+      const a=el('a','rel rel-link'); a.href=d.url; a.target='_blank'; a.rel='noopener';
+      a.innerHTML=`<div class="rt">${d.t} <span class="dl-ext">↗</span></div><div class="rd">${d.d}</div>`;
+      rel.appendChild(a);
+    } else {
+      rel.appendChild(el('div','rel',`<div class="rt">${d.t}</div><div class="rd">${d.d} <span class="dl-off-tag">링크 미설정</span></div>`));
+    }
+  });
+  // final DoD
+  const fd=document.getElementById('finalDod');
+  DATA.finalDod.forEach((it,i)=> fd.appendChild(checkItem('fdod:'+i, it, 'p1')));
+}
+
+/* ===================== PROGRESS ===================== */
+function setRing(ringEl, pct){
+  const c=ringEl.querySelector('.rfill'); if(!c) return;
+  const len=parseFloat(c.getAttribute('stroke-dasharray'));
+  c.style.strokeDashoffset = len*(1-pct/100);
+}
+function countDone(ids){ return ids.reduce((n,id)=> n+(isDone(id)?1:0),0); }
+
+function updateProgress(){
+  // per phase
+  let totAll=0, doneAll=0;
+  DATA.phases.forEach(p=>{
+    if(p.deferred) return;
+    const ids=phaseItemIds(p), done=countDone(ids), tot=ids.length;
+    totAll+=tot; doneAll+=done;
+    const pct = tot? Math.round(done/tot*100):0;
+    const phaseEl=document.querySelector('.phase[data-n="'+p.n+'"]');
+    if(phaseEl){
+      const r=phaseEl.querySelector('.ph-ring'); if(r){ setRing(r,pct); const pctEl=r.querySelector('.pct'); if(pctEl) pctEl.textContent=pct+'%'; }
+      const cnt=phaseEl.querySelector('.ph-cnt'); if(cnt) cnt.textContent=done+'/'+tot;
+      // mini
+    }
+    const mini=document.querySelector('.pm[data-n="'+p.n+'"]');
+    if(mini){ mini.querySelector('.pm-pct').textContent=pct+'%'; mini.querySelector('.pm-fill').style.width=pct+'%';
+      mini.querySelector('.pm-cnt').textContent=done+' / '+tot+' 항목'; }
+  });
+  const ovPct = totAll? Math.round(doneAll/totAll*100):0;
+  document.getElementById('ovPct').textContent=ovPct;
+  document.getElementById('ovCnt').textContent=doneAll+' / '+totAll;
+  document.getElementById('bigFill').style.width=ovPct+'%';
+  document.getElementById('miniFill').style.width=ovPct+'%';
+  document.getElementById('miniPct').textContent=ovPct+'%';
+  document.getElementById('ovState').textContent = ovPct===0?'시작 전': ovPct===100?'완료 ✓': '진행 중';
+
+  // final DoD
+  const fdDone=countDone(finalDodIds), fdTot=finalDodIds.length;
+  const fdPct=fdTot?Math.round(fdDone/fdTot*100):0;
+  const dr=document.getElementById('dodRing');
+  document.getElementById('dodCnt').textContent=fdDone+'/'+fdTot;
+  setRing(dr, fdPct); const dp=dr.querySelector('.pct'); if(dp) dp.textContent=fdPct+'%';
+}
+
+/* ===================== FILTERS / VIEW ===================== */
+let viewMode='all', brkOnly=false;
+function applyView(){
+  document.querySelectorAll('.phase').forEach(ph=>{
+    // breaking dim
+    ph.classList.toggle('brk-dim', brkOnly && ph.dataset.brk==='0' && ph.dataset.n!=='5' ? false : (brkOnly && ph.dataset.brk==='0'));
+  });
+  // todo filter: hide done tasks & done check-items
+  const hideDone = viewMode==='todo';
+  document.querySelectorAll('.task, .check-item').forEach(it=>{
+    const done=it.classList.contains('is-done');
+    it.style.display = (hideDone && done) ? 'none' : '';
+  });
+}
+
+/* ===================== DEPENDENCY GRAPH (interactive SVG) ===================== */
+function buildDepGraph(){
+  const C={p1:'var(--blue)',p2:'var(--navy)',p3:'var(--green)',p4:'var(--orange)',df:'var(--slate)'};
+  const TINT={p1:'#EAF2FF',p2:'#E7EAF1',p3:'#E7F6EE',p4:'#FFF3E4',df:'#EEF1F5'};
+  const NW=210,NH=66,colA=60,colB=590, OFF=14;
+  const A={'816':54,'821':188,'823':322,'819':456}, B={'817':44,'824':150,'822':260,'825':370,'fine':480};
+  const nodes={
+    '816':{x:colA,y:A['816'],ph:'p1',t:'DPP 필수 속성 추가'},
+    '821':{x:colA,y:A['821'],ph:'p3',t:'글로벌 유일성 ID'},
+    '823':{x:colA,y:A['823'],ph:'p1',t:'identifier_type Enum'},
+    '819':{x:colA,y:A['819'],ph:'p4',t:'ValueElement 단위'},
+    '817':{x:colB,y:B['817'],ph:'p2',t:'표준 URI 엔드포인트'},
+    '824':{x:colB,y:B['824'],ph:'p3',t:'제품 ID 계층 구조'},
+    '822':{x:colB,y:B['822'],ph:'p3',t:'LEI 유효성 검증'},
+    '825':{x:colB,y:B['825'],ph:'p3',t:'ProductID 스키마'},
+    'fine':{x:colB,y:B['fine'],ph:'df',t:'Fine-grained API',sub:'collections / elements'},
+  };
+  const edges=[['816','817','p2'],['816','824','p3'],['816','822','p3'],['821','822','p3'],['823','825','p3'],['819','fine','df']];
+  const W=820,H=580;
+  let s=`<svg class="dep-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 z" fill="#8A93A0"/></marker></defs>`;
+  // edges
+  edges.forEach(([f,t,ph],i)=>{
+    const a=nodes[f], b=nodes[t];
+    const ax=a.x+NW, ay=a.y+OFF+NH/2, bx=b.x, by=b.y+OFF+NH/2, mx=(ax+bx)/2;
+    s+=`<path class="dep-edge" data-edge="${f}-${t}" d="M ${ax} ${ay} C ${mx} ${ay}, ${mx} ${by}, ${bx-8} ${by}" fill="none" stroke="${C[ph]}" stroke-width="2.2" marker-end="url(#ar)"/>`;
+  });
+  // nodes
+  Object.entries(nodes).forEach(([id,n])=>{
+    const dash = n.ph==='df' ? 'stroke-dasharray="6 4"' : '';
+    const phaseTag = `<text x="${n.x+NW-14}" y="${n.y+OFF+23}" text-anchor="end" font-size="10.5" font-weight="700" fill="${C[n.ph]}">Phase ${n.ph==='df'?5:n.ph.slice(1)}</text>`;
+    let head, sub;
+    if(id==='fine'){
+      head = `<text x="${n.x+18}" y="${n.y+OFF+27}" font-size="15" font-weight="700" fill="${C[n.ph]}">Fine-grained API</text>`;
+      sub  = `<text x="${n.x+18}" y="${n.y+OFF+50}" font-size="13" fill="#16202E">${n.sub}</text>`;
+    } else {
+      head = `<a href="${GH_REPO}/issues/${id}" target="_blank" rel="noopener" style="cursor:pointer">`+
+        ghMarkSvg(n.x+15, n.y+OFF+11, 0.92, '#1F2328') +
+        `<text x="${n.x+35}" y="${n.y+OFF+25}" font-size="13"><tspan font-weight="600" fill="#59636E">Issue </tspan><tspan font-weight="800" fill="#0969DA">#${id}</tspan></text></a>` +
+        phaseTag;
+      sub  = `<text x="${n.x+18}" y="${n.y+OFF+51}" font-size="14" font-weight="600" fill="#16202E">${n.t}</text>`;
+    }
+    s+=`<g class="dep-node" data-node="${id}">
+      <rect x="${n.x}" y="${n.y+OFF}" width="${NW}" height="${NH}" rx="13" fill="${TINT[n.ph]}" stroke="${C[n.ph]}" stroke-width="1.5" ${dash}/>
+      <rect x="${n.x}" y="${n.y+OFF}" width="5" height="${NH}" rx="2.5" fill="${C[n.ph]}"/>
+      ${head}${sub}</g>`;
+  });
+  s+=`</svg>`;
+  const host=document.getElementById('depGraph'); host.innerHTML=s;
+
+  // interactivity: hover node → highlight its edges + neighbors
+  const svg=host.querySelector('.dep-svg');
+  const adj={}; edges.forEach(([f,t])=>{ (adj[f]=adj[f]||[]).push([t,f+'-'+t]); (adj[t]=adj[t]||[]).push([f,f+'-'+t]); });
+  host.querySelectorAll('.dep-node').forEach(g=>{
+    const id=g.dataset.node;
+    g.addEventListener('mouseenter',()=>{
+      svg.classList.add('dim'); g.classList.add('hl');
+      (adj[id]||[]).forEach(([nb,ek])=>{
+        const nbEl=host.querySelector('.dep-node[data-node="'+nb+'"]'); if(nbEl) nbEl.classList.add('hl');
+        const edEl=host.querySelector('.dep-edge[data-edge="'+ek+'"]'); if(edEl) edEl.classList.add('hl');
+      });
+    });
+    g.addEventListener('mouseleave',()=>{
+      svg.classList.remove('dim');
+      host.querySelectorAll('.hl').forEach(x=>x.classList.remove('hl'));
+    });
+  });
+}
+
+/* ===================== PHASE FLOW RIBBON ===================== */
+function buildFlow(){
+  const steps=[
+    {ph:'p1',n:1,t:'DB 스키마 확장',sp:'1~2 스프린트',flags:[['Non-breaking','var(--green)'],['BC-3 1건 포함','var(--orange)']]},
+    {ph:'p3',n:3,t:'식별자 체계 강화',sp:'1~2 스프린트',flags:[['Non-breaking','var(--green)'],['병렬 가능','var(--blue)']]},
+    {ph:'p2',n:2,t:'API 경로 표준화',sp:'1~2 스프린트',flags:[['Breaking','var(--red)'],['FE 협의','var(--orange)']]},
+    {ph:'p4',n:4,t:'응답 구조 표준화',sp:'1 스프린트',flags:[['Breaking','var(--red)'],['FE 협의','var(--orange)']]},
+    {ph:'p5',n:5,t:'레지스트리·벌크',sp:'외부 확정 후',flags:[['보류','var(--slate)']]},
+  ];
+  const host=document.getElementById('flow');
+  steps.forEach((st,i)=>{
+    const step=el('div','flow-step acc-'+st.ph);
+    const flags=st.flags.map(f=>`<span class="fl" style="color:${f[1]}">${f[0]}</span>`).join('');
+    step.innerHTML=`<div class="flow-card${st.ph==='p5'?' dashed':''}">
+      <div class="flow-cap">PHASE ${st.n}</div>
+      <div class="flow-body"><div class="t">${st.t}</div><div class="sp">${st.sp}</div>
+        <div class="flow-flags">${flags}</div></div></div>`;
+    host.appendChild(step);
+    if(i<steps.length-1) host.appendChild(el('div','flow-arrow',null)).textContent='→';
+  });
+}
+
+/* ===================== TopBar mini fill / phase-mini cards ===================== */
+function buildPhaseMini(){
+  const host=document.getElementById('phaseMini');
+  overallPhases.forEach(p=>{
+    const m=PHASE_META[p.n];
+    const pm=el('button','pm'); pm.dataset.n=p.n; pm.type='button';
+    pm.innerHTML=`<div class="pm-h"><span class="pm-dot" style="background:${m.color}"></span>Phase ${p.n}</div>
+      <div class="pm-pct">0%</div>
+      <div class="pm-track"><div class="pm-fill" style="background:${m.color}"></div></div>
+      <div class="pm-cnt">0 / 0 항목</div>`;
+    pm.addEventListener('click',()=>{
+      const target=document.querySelector('.phase[data-n="'+p.n+'"]');
+      if(target){ target.classList.add('open'); target.scrollIntoView({behavior:'smooth',block:'start'}); }
+    });
+    host.appendChild(pm);
+  });
+}
+
+/* ===================== TOAST ===================== */
+let toastT;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1900); }
+
+/* 저장 상태 표시 */
+function initSaveStatus(){
+  const el=document.getElementById('saveStatus'); if(!el) return;
+  const txt=el.querySelector('.ss-text');
+  if(STORAGE_OK){
+    txt.textContent='자동 저장';
+    el.title='체크한 항목은 이 브라우저에 자동 저장되어, 페이지를 다시 열어도 유지됩니다.';
+  } else {
+    el.classList.add('off');
+    txt.textContent='미저장 (미리보기)';
+    el.title='이 미리보기 환경에서는 저장이 제한됩니다. 파일을 호스팅하거나 브라우저에서 직접 열면 진행 상황이 자동 저장됩니다.';
+  }
+}
+let saveFlashT;
+function flashSaved(){
+  const el=document.getElementById('saveStatus'); if(!el || !STORAGE_OK) return;
+  const txt=el.querySelector('.ss-text');
+  el.classList.add('saved'); txt.textContent='저장됨';
+  clearTimeout(saveFlashT);
+  saveFlashT=setTimeout(()=>{ el.classList.remove('saved'); txt.textContent='자동 저장'; }, 1300);
+}
+
+/* ===================== INIT ===================== */
+renderBC();
+buildPhaseMini();
+buildDepGraph();
+buildFlow();
+renderPhases();
+renderTables();
+updateProgress();
+initSaveStatus();
+
+// view filters
+document.querySelectorAll('#segView button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('#segView button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); viewMode=b.dataset.v; applyView();
+  });
+});
+document.getElementById('brkToggle').addEventListener('click',function(){
+  brkOnly=!brkOnly; this.classList.toggle('on',brkOnly); applyView();
+});
+
+// reset
+document.getElementById('btnReset').addEventListener('click',()=>{
+  if(!Object.keys(state).length){ toast('이미 모두 미완료 상태입니다'); return; }
+  if(confirm('모든 체크 항목을 초기화할까요? 저장된 진행 상태가 사라집니다.')){
+    state={}; persist();
+    document.querySelectorAll('.is-done').forEach(x=>{ x.classList.remove('is-done'); const c=x.querySelector('.cbx'); if(c)c.setAttribute('aria-checked','false'); });
+    updateProgress(); applyView(); toast('진행 상태를 초기화했습니다');
+  }
+});
+</script>
+</body>
+</html>
